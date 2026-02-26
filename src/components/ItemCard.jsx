@@ -6,7 +6,7 @@ import { useCats } from '../store/useItems.js';
 import { catInfo } from '../utils/data.js';
 
 // ─── ITEM CARD with Agent ─────────────────────────────────────────────────────
-export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig }) {
+export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig, onArchive }) {
   const [loading, setLoading]     = useState(false);
   const [expanded, setExpanded]   = useState(false);
   const [displayed, setDisplayed] = useState(""); // typewriter text
@@ -140,6 +140,27 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
             {hasNote && (
               <button onClick={clearNote} style={{ fontSize:8,color:T.textDim,background:"none",border:"none",cursor:"pointer",lineHeight:1 }}>✕</button>
             )}
+          </div>
+        )}
+        
+        {/* Archive btn - only show for completed items */}
+        {item.done && onArchive && (
+          <div style={{ display:"flex", flexDirection:"column", gap:4, flexShrink:0, alignItems:"center" }}>
+            <button
+              onClick={() => onArchive(item)}
+              title="归档"
+              style={{
+                width:28, height:28, borderRadius:"50%", border:"none",
+                background: T.surface2,
+                cursor:"pointer",
+                fontSize:14, display:"flex", alignItems:"center", justifyContent:"center",
+                color: T.textDim,
+                boxShadow: `0 0 0 2px ${T.border2}`,
+                transition:"all 0.25s",
+              }}
+            >
+              📦
+            </button>
           </div>
         )}
       </div>

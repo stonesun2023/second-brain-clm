@@ -6,6 +6,7 @@ import { useItems, useTheme } from './hooks/useStorage.js'
 import CapturePage from './components/CapturePage.jsx'
 import BoardPage from './components/BoardPage.jsx'
 import InsightPage from './components/InsightPage.jsx'
+import ArchivePage from './components/ArchivePage.jsx'
 import CaptureDrawer from './components/CaptureDrawer.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 import RingProgress from './components/shared/RingProgress.jsx'
@@ -79,13 +80,23 @@ export default function App() {
   const onTouchMove  = (e) => { if(!dragging.current) return; setDragDx(e.touches[0].clientX-touchX.current); };
   const onTouchEnd   = () => {
     dragging.current=false;
-    if(dragDx<-60&&page<2) setPage(p=>p+1);
+    if(dragDx<-60&&page<3) setPage(p=>p+1);
     if(dragDx>60&&page>0)  setPage(p=>p-1);
     setDragDx(0);
   };
 
   const toggleDone = (id) => setItems(prev=>prev.map(i=>i.id===id?{...i,done:!i.done}:i));
   const setAgentNote = (id, note) => setItems(prev=>prev.map(i=>i.id===id?{...i,agentNote:note}:i));
+
+  // 从主列表删除条目
+  const removeItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
+
+  // 监听归档恢复事件，将条目添加回主列表
+  useEffect(() => {
+    const handler = (e) => setItems(prev => [e.detail, ...prev]);
+    window.addEventListener('archive-restored', handler);
+    return () => window.removeEventListener('archive-restored', handler);
+  }, []);
 
   const addItem = (data) => {
     const newItem = {
@@ -164,7 +175,7 @@ export default function App() {
 
         {/* Page dots */}
         <div style={{ display:"flex", justifyContent:"center", gap:8, marginTop:10, marginBottom:2 }}>
-          {["捕获","看板","复盘"].map((lbl,i)=>(
+          {["捕获","看板","复盘","存档"].map((lbl,i)=>(
             <button key={i} onClick={()=>setPage(i)} style={{
               background:"none", border:"none", cursor:"pointer",
               display:"flex", flexDirection:"column", alignItems:"center", gap:4, padding:"4px 8px",
@@ -182,16 +193,17 @@ export default function App() {
         style={{ flex:1, overflow:"hidden", position:"relative" }}
       >
         <div style={{
-          display:"flex", width:"300%", height:"100%",
-          transform:`translateX(calc(${-page*(100/3)}% + ${dragDx/3}px))`,
+          display:"flex", width:"400%", height:"100%",
+          transform:`translateX(calc(${-page*(100/4)}% + ${dragDx/4}px))`,
           transition:dragging.current?"none":"transform 0.38s cubic-bezier(.25,.8,.25,1)",
         }}>
           {[
-            <CapturePage key="c" items={items} toggleDone={toggleDone} setAgentNote={setAgentNote} T={T} aiConfig={aiConfig}/>,
+            <CapturePage key="c" items={items} toggleDone={toggleDone} setAgentNote={setAgentNote} T={T} aiConfig={aiConfig} onRemove={removeItem}/>,
             <BoardPage   key="b" items={items} week={WEEK} pct={pct} urgent={urgent} T={T}/>,
             <InsightPage key="i" items={items} done={done} pct={pct} T={T} aiConfig={aiConfig}/>,
+            <ArchivePage key="a" T={T}/>,
           ].map((p,i)=>(
-            <div key={i} style={{ width:`${100/3}%`, height:"100%", overflowY:"auto", padding:"10px 20px 120px", flexShrink:0 }}>
+            <div key={i} style={{ width:`${100/4}%`, height:"100%", overflowY:"auto", padding:"10px 20px 120px", flexShrink:0 }}>
               {p}
             </div>
           ))}

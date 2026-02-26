@@ -37,4 +37,5 @@ export const STORAGE_KEY = "sb-items-v4";
 export const THEME_KEY   = "sb-theme-v4";
 export const MODEL_KEY   = "sb-model-v4";
 export const APIKEY_PRE  = "sb-apikey-v4-";
+export const ARCHIVE_KEY = "sb-archive-v1";
 export const catInfo = (id) => CATS.find(c=>c.id===id) || { color:"#888", icon:"·", label:id };

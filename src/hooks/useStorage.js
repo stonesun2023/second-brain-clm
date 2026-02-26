@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { STORAGE_KEY, THEME_KEY } from '../utils/data.js';
+import { STORAGE_KEY, THEME_KEY, ARCHIVE_KEY } from '../utils/data.js';
 
 // 初始数据
 const INIT_ITEMS = [
@@ -55,4 +55,85 @@ export function useTheme() {
   }, [isDark]);
 
   return [isDark, setIsDark];
+}
+
+// 归档数据管理
+export function useArchive() {
+  const [archive, setArchive] = useState(() => {
+    try {
+      const saved = localStorage.getItem(ARCHIVE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch(e) { return []; }
+  });
+  
+  const addArchive = async (item) => {
+    try {
+      const archivedItem = {
+        ...item,
+        archivedAt: new Date().toISOString()
+      };
+      // 确保归档条目有唯一ID
+      if (!archivedItem.id) {
+        archivedItem.id = Date.now();
+      }
+      // 检查是否已存在相同ID的归档条目，避免重复
+      const existingIndex = archive.findIndex(a => a.id === archivedItem.id);
+      let newArchive;
+      if (existingIndex >= 0) {
+        newArchive = [...archive];
+        newArchive[existingIndex] = archivedItem;
+      } else {
+        newArchive = [...archive, archivedItem];
+      }
+      setArchive(newArchive);
+      localStorage.setItem(ARCHIVE_KEY, JSON.stringify(newArchive));
+      // 触发自定义事件通知其他组件
+      window.dispatchEvent(new CustomEvent('archive-updated', { detail: newArchive }));
+    } catch (e) {
+      console.warn("Failed to add archive:", e);
+    }
+  };
+  
+  const removeArchive = async (id) => {
+    try {
+      const newArchive = archive.filter(a => a.id !== id);
+      setArchive(newArchive);
+      localStorage.setItem(ARCHIVE_KEY, JSON.stringify(newArchive));
+      // 触发自定义事件通知其他组件
+      window.dispatchEvent(new CustomEvent('archive-updated', { detail: newArchive }));
+    } catch (e) {
+      console.warn("Failed to remove archive:", e);
+    }
+  };
+  
+  const restoreArchive = async (id) => {
+    try {
+      const archivedItem = archive.find(a => a.id === id);
+      if (!archivedItem) return null;
+      const newArchive = archive.filter(a => a.id !== id);
+      setArchive(newArchive);
+      localStorage.setItem(ARCHIVE_KEY, JSON.stringify(newArchive));
+      // 触发自定义事件通知其他组件
+      window.dispatchEvent(new CustomEvent('archive-updated', { detail: newArchive }));
+      // 返回恢复的条目（移除归档时间戳）
+      const { archivedAt, ...rest } = archivedItem;
+      return rest;
+    } catch (e) {
+      console.warn("Failed to restore archive:", e);
+      return null;
+    }
+  };
+  
+  const clearArchive = async () => {
+    try {
+      setArchive([]);
+      localStorage.setItem(ARCHIVE_KEY, JSON.stringify([]));
+      // 触发自定义事件通知其他组件
+      window.dispatchEvent(new CustomEvent('archive-updated', { detail: [] }));
+    } catch (e) {
+      console.warn("Failed to clear archive:", e);
+    }
+  };
+  
+  return { archive, addArchive, removeArchive, restoreArchive, clearArchive };
 }

@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Pill, ModeBtn, SectionLabel } from './shared/index.jsx';
 import { useCats } from '../store/useItems.js';
+import { useArchive } from '../hooks/useStorage.js';
 import ItemCard from './ItemCard.jsx';
 
-export default function CapturePage({ items, toggleDone, setAgentNote, T, aiConfig }) {
+export default function CapturePage({ items, toggleDone, setAgentNote, T, aiConfig, onRemove }) {
   const [filter, setFilter] = useState("all");
   const [autoMode, setAutoMode] = useState(false);
   const [query, setQuery] = useState("");
   const [cats] = useCats();
+  const { addArchive } = useArchive();
   const filtered  = filter==="all" ? items : items.filter(i=>i.cat===filter);
   const pending   = filtered.filter(i=>!i.done);
   const doneItems = filtered.filter(i=>i.done);
@@ -58,7 +60,10 @@ export default function CapturePage({ items, toggleDone, setAgentNote, T, aiConf
       {doneItems.length>0 && (
         <>
           <SectionLabel T={T} style={{marginTop:16}}>已完成 · {doneItems.length}</SectionLabel>
-          {doneItems.map(i=><ItemCard key={i.id} item={i} onToggle={toggleDone} onNote={setAgentNote} autoMode={autoMode} T={T} aiConfig={aiConfig}/>)}
+          {doneItems.map(i=><ItemCard key={i.id} item={i} onToggle={toggleDone} onNote={setAgentNote} autoMode={autoMode} T={T} aiConfig={aiConfig} onArchive={(item) => { 
+            addArchive(item); 
+            onRemove(item.id); 
+          }}/>)} 
         </>
       )}
     </div>
