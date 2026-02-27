@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pill, ModeBtn, SectionLabel } from './shared/index.jsx';
 import { useCats } from '../store/useItems.js';
 import { useArchive } from '../hooks/useStorage.js';
+import { loadAgents } from '../utils/agents.js';
 import ItemCard from './ItemCard.jsx';
 
 export default function CapturePage({ items, toggleDone, setAgentNote, T, aiConfig, onRemove }) {
@@ -10,6 +11,7 @@ export default function CapturePage({ items, toggleDone, setAgentNote, T, aiConf
   const [query, setQuery] = useState("");
   const [cats] = useCats();
   const { addArchive } = useArchive();
+  const agents = loadAgents();
   const filtered  = filter==="all" ? items : items.filter(i=>i.cat===filter);
   const pending   = filtered.filter(i=>!i.done);
   const doneItems = filtered.filter(i=>i.done);

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { SUMMARY_AGENT } from '../utils/agents.js';
+import { SUMMARY_AGENT, loadAgents } from '../utils/agents.js';
 import { callAI } from '../utils/ai.js';
 import { catInfo } from '../utils/data.js';
 import { Spinner, SectionLabel } from './shared/index.jsx';

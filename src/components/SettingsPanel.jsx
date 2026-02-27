@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MODELS, callAI } from '../utils/ai.js';
 import { useCats } from '../store/useItems.js';
 import { Spinner } from './shared/index.jsx';
-import { AGENTS } from '../utils/agents.js';
+import { AGENTS, loadAgents, saveAgents, DEFAULT_AGENTS_EXPORT } from '../utils/agents.js';
 
 export default function SettingsPanel({ T, modelId, apiKeys, onModelChange, onApiKeyChange, onClose }) {
   const [localKeys, setLocalKeys] = useState({...apiKeys});
@@ -61,6 +61,22 @@ export default function SettingsPanel({ T, modelId, apiKeys, onModelChange, onAp
   };
 
   const currentM = MODELS.find(x=>x.id===modelId);
+
+  // Agent 人设管理
+  const [agents, setAgents] = useState(loadAgents());
+  const [editingAgent, setEditingAgent] = useState(null);
+
+  const handleAgentSave = (id, newSystem) => {
+    const updated = { ...agents, [id]: { ...agents[id], system: newSystem } };
+    setAgents(updated);
+    saveAgents(updated);
+  };
+
+  const handleAgentReset = (id) => {
+    const updated = { ...agents, [id]: { ...DEFAULT_AGENTS_EXPORT[id] } };
+    setAgents(updated);
+    saveAgents(updated);
+  };
 
   return (
     <div style={{ position:"fixed",inset:0,zIndex:300,display:"flex",flexDirection:"column",justifyContent:"flex-end" }}>
@@ -256,6 +272,72 @@ export default function SettingsPanel({ T, modelId, apiKeys, onModelChange, onAp
               opacity: (!newCatName.trim() || !newCatIcon.trim()) ? 0.5 : 1,
             }}>添加</button>
           </div>
+        </div>
+
+        {/* Agent 人设管理 */}
+        <div style={{ marginTop:18, paddingTop:14, borderTop:`1px solid ${T.border2}` }}>
+          <div style={{ fontSize:14,fontWeight:700,color:T.text,marginBottom:8 }}>Agent 人设</div>
+          <div style={{ fontSize:10,color:T.textDim,marginBottom:12 }}>自定义每个 Agent 的回复风格和提示词</div>
+          
+          {/* Agent 列表 */}
+          <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:12 }}>
+            {Object.entries(agents).map(([id, agent]) => (
+              <div key={id} style={{
+                display:"flex",alignItems:"center",gap:10,
+                padding:"8px 12px", borderRadius:8,
+                background:T.surface2, border:`1px solid ${T.border2}`,
+              }}>
+                <div style={{ fontSize:16 }}>{agent.avatar}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:12,fontWeight:600,color:T.text }}>{agent.name}</div>
+                  <div style={{ fontSize:10,color:T.textDim }}>{agent.greeting}</div>
+                </div>
+                <button onClick={() => setEditingAgent(editingAgent === id ? null : id)} style={{
+                  padding:"4px 8px", borderRadius:6, border:`1px solid ${T.border2}`,
+                  background:"transparent", color:T.textDim, fontSize:11, cursor:"pointer",
+                }}>{editingAgent === id ? "收起" : "编辑"}</button>
+              </div>
+            ))}
+          </div>
+
+          {/* 编辑区域 */}
+          {editingAgent && (
+            <div style={{
+              background:T.surface2, border:`1px solid ${T.border2}`,
+              borderRadius:10, padding:"12px 14px", marginBottom:12,
+            }}>
+              <div style={{ fontSize:12,fontWeight:600,color:T.text,marginBottom:8 }}>
+                编辑 {agents[editingAgent].name} 的 system prompt
+              </div>
+              <textarea
+                value={agents[editingAgent].system}
+                onChange={(e) => setAgents({ ...agents, [editingAgent]: { ...agents[editingAgent], system: e.target.value } })}
+                style={{
+                  width:"100%", background:T.surface, border:`1px solid ${T.border}`,
+                  borderRadius:8, padding:"10px 12px", color:T.text,
+                  fontSize:12, fontFamily:"inherit", outline:"none",
+                  minHeight:120, resize:"vertical",
+                }}
+              />
+              <div style={{ display:"flex",gap:8,marginTop:10 }}>
+                <button onClick={() => {
+                  handleAgentSave(editingAgent, agents[editingAgent].system);
+                  setEditingAgent(null);
+                }} style={{
+                  padding:"8px 12px", borderRadius:8, border:"none",
+                  background:T.accent, color:"#000", fontSize:12, fontWeight:600, cursor:"pointer",
+                }}>保存</button>
+                <button onClick={() => handleAgentReset(editingAgent)} style={{
+                  padding:"8px 12px", borderRadius:8, border:`1px solid ${T.border2}`,
+                  background:"transparent", color:T.textDim, fontSize:12, cursor:"pointer",
+                }}>重置默认</button>
+                <button onClick={() => setEditingAgent(null)} style={{
+                  padding:"8px 12px", borderRadius:8, border:`1px solid ${T.border2}`,
+                  background:"transparent", color:T.textDim, fontSize:12, cursor:"pointer",
+                }}>取消</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Where to get keys — collapsed secondary info */}

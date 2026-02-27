@@ -36,7 +36,7 @@ export const MODELS = [
 ];
 
 // Universal AI call — handles all providers transparently
-export async function callAI({ modelId, apiKey, system, userContent, maxTokens = 400 }) {
+export async function callAI({ modelId, apiKey, system, userContent, maxTokens = 400, enableWebSearch = false }) {
   const m = MODELS.find(x => x.id === modelId) || MODELS[0];
 
   // ── Anthropic ──
@@ -63,19 +63,31 @@ export async function callAI({ modelId, apiKey, system, userContent, maxTokens =
   }
 
   // ── OpenAI-compatible (DeepSeek / Kimi / GLM) ──
+  const body = {
+    model: m.model, max_tokens: maxTokens,
+    messages:[
+      { role:"system", content: system },
+      { role:"user",   content: userContent },
+    ],
+  };
+
+  // 如果启用联网搜索且是 GLM 模型
+  if (enableWebSearch && modelId.includes("glm")) {
+    body.tools = [{
+      "type": "web_search",
+      "web_search": {
+        "enable": "True"
+      }
+    }];
+  }
+
   const res = await fetch(m.endpoint, {
     method:"POST",
     headers:{
       "Content-Type":"application/json",
       "Authorization":`Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model: m.model, max_tokens: maxTokens,
-      messages:[
-        { role:"system", content: system },
-        { role:"user",   content: userContent },
-      ],
-    })
+    body: JSON.stringify(body)
   });
   if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||`HTTP ${res.status}`); }
   const data = await res.json();

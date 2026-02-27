@@ -1,4 +1,5 @@
-export const AGENTS = {
+// 默认 agents 配置
+const DEFAULT_AGENTS = {
   spark: {
     name:"灵感伙伴", icon:"⚡", color:"#D4920A", avatar:"💡",
     greeting:"哦这个有意思！",
@@ -60,6 +61,34 @@ export const AGENTS = {
 像在现场跟他一起拍，说人话，80字以内。`,
   },
 };
+
+// 从 localStorage 读取自定义 agents，读不到返回默认 agents
+export function loadAgents() {
+  try {
+    const saved = localStorage.getItem("sb-agents-v1");
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.warn("读取自定义 agents 失败:", e);
+  }
+  return DEFAULT_AGENTS;
+}
+
+// 保存到 localStorage
+export function saveAgents(agents) {
+  try {
+    localStorage.setItem("sb-agents-v1", JSON.stringify(agents));
+  } catch (e) {
+    console.warn("保存自定义 agents 失败:", e);
+  }
+}
+
+// 导出默认 agents 用于重置
+export const DEFAULT_AGENTS_EXPORT = DEFAULT_AGENTS;
+
+// 导出默认 agents（兼容旧代码）
+export const AGENTS = DEFAULT_AGENTS;
 
 export const SUMMARY_AGENT = {
   name:"全局观察者", icon:"🔄", color:"#888",

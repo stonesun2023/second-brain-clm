@@ -33,6 +33,7 @@ export default function CaptureDrawer({ onClose, onAdd, T }) {
       setDeadline("");
     }
   }, [text]);
+
   
   const submit=()=>{ if(!text.trim()) return; onAdd({cat:selCat,text:text.trim(),priority,deadline}); onClose(); };
   return (
@@ -83,6 +84,7 @@ export default function CaptureDrawer({ onClose, onAdd, T }) {
             {timeHint}
           </div>
         )}
+        
         <button onClick={submit} style={{ width:"100%",marginTop:14,padding:"12px",background:T.accent,color:"#000",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit" }}>记录 ⌘↵</button>
       </div>
     </div>

@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { AGENTS } from '../utils/agents.js';
+import { AGENTS, loadAgents } from '../utils/agents.js';
 import { callAI } from '../utils/ai.js';
 import { Spinner } from './shared/index.jsx';
 import { useCats } from '../store/useItems.js';
 import { catInfo } from '../utils/data.js';
+import { extractLocation, buildAmapUrl } from '../utils/mapUtils.js';
 
 // ─── ITEM CARD with Agent ─────────────────────────────────────────────────────
 export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig, onArchive }) {
@@ -13,8 +14,11 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
   const [typing, setTyping]       = useState(false);
   const [bookInfo, setBookInfo]   = useState(null); // 书摘信息
   const [bookInfoLoading, setBookInfoLoading] = useState(false);
+  const [linkSummary, setLinkSummary] = useState(null); // 链接摘要
+  const [linkSummaryLoading, setLinkSummaryLoading] = useState(false);
   const c     = catInfo(item.cat);
-  const agent = AGENTS[item.cat] || { name: "未知", avatar: "❓", greeting: "", system: "" };
+  const agents = loadAgents();
+  const agent = agents[item.cat] || { name: "未知", avatar: "❓", greeting: "", system: "" };
   const typingRef = useRef(null);
 
   // Auto-trigger
@@ -123,6 +127,66 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
       setBookInfo({ message: `查询失败：${e.message}` });
     } finally {
       setBookInfoLoading(false);
+    }
+  };
+
+  // 地点识别和导航功能
+  const handleNavigate = async () => {
+    try {
+      const locationResult = await extractLocation(item.text, aiConfig);
+      if (locationResult.hasLocation && locationResult.locationName) {
+        const url = buildAmapUrl(locationResult.locationName);
+        if (url) {
+          window.open(url, '_blank');
+        }
+      }
+    } catch (e) {
+      console.error('导航失败:', e);
+    }
+  };
+
+  // 链接摘要功能
+  const handleGetSummary = async () => {
+    try {
+      const urlMatch = item.text.match(/https?:\/\/[^\s]+/);
+      if (!urlMatch) return;
+      
+      const url = urlMatch[0];
+      const prompt = `你是内容摘要助手。联网搜索用户提供的链接后，返回纯 JSON，不加任何 markdown 或解释：
+{
+  "verified": true或false,
+  "topic": "一句话主题",
+  "points": ["核心要点1", "核心要点2", "核心要点3"],
+  "value": "对读者的价值"
+}
+如果搜索不到内容，返回：{"verified": false, "topic": "无法获取页面内容", "points": [], "value": "建议直接访问链接"}`;
+      
+      const result = await callAI({
+        modelId: aiConfig.modelId,
+        apiKey: aiConfig.apiKey,
+        system: prompt,
+        userContent: url,
+        maxTokens: 300,
+        enableWebSearch: true,
+      });
+      
+      // 清理可能的 markdown 代码块包裹
+      const clean = result.replace(/```json|```/g, "").trim();
+      
+      // 尝试解析 JSON
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(clean);
+      } catch (e) {
+        // 如果解析失败，尝试提取关键信息
+        parsedResult = { verified: false, topic: "解析失败", points: [], value: result };
+      }
+      
+      setLinkSummary(parsedResult);
+    } catch (e) {
+      setLinkSummary({ verified: false, topic: "获取失败", points: [], value: `❌ ${e.message}` });
+    } finally {
+      setLinkSummaryLoading(false);
     }
   };
 
@@ -314,6 +378,85 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
                       <span style={{ color:T.text, fontStyle:"italic" }}>{bookInfo.coreIdea}</span>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 导航按钮 - 所有类目都显示 */}
+          {expanded && (
+            <div style={{ marginTop:8, display:"flex", justifyContent:"flex-end" }}>
+              <button
+                onClick={handleNavigate}
+                style={{
+                  padding:"6px 10px", borderRadius:16,
+                  background: T.surface,
+                  border:`1px solid ${T.border}`,
+                  cursor:"pointer",
+                  fontSize:10, color: T.textDim,
+                  fontFamily:"inherit",
+                  display:"flex", alignItems:"center", gap:6,
+                }}
+              >
+                📍 导航
+              </button>
+            </div>
+          )}
+
+          {/* 链接摘要按钮 - 检测到 URL 时显示 */}
+          {expanded && item.text.match(/https?:\/\/[^\s]+/) && (
+            <div style={{ marginTop:8, display:"flex", justifyContent:"flex-end" }}>
+              <button
+                onClick={handleGetSummary}
+                disabled={linkSummaryLoading}
+                title={aiConfig.modelId.includes("glm") ? "获取链接摘要" : "当前模型不支持联网，请切换到 GLM"}
+                style={{
+                  padding:"6px 10px", borderRadius:16,
+                  background: linkSummary ? T.surface : (aiConfig.modelId.includes("glm") ? T.accent : T.surface2),
+                  border:`1px solid ${T.border}`,
+                  cursor: linkSummaryLoading ? "wait" : (aiConfig.modelId.includes("glm") ? "pointer" : "not-allowed"),
+                  fontSize:10, color: linkSummary ? T.textMuted : (aiConfig.modelId.includes("glm") ? "#000" : T.textDim),
+                  fontFamily:"inherit",
+                  display:"flex", alignItems:"center", gap:6,
+                }}
+              >
+                {linkSummaryLoading ? <Spinner color={T.accent} size={12} /> : "🔗 获取摘要"}
+              </button>
+            </div>
+          )}
+
+          {/* 链接摘要卡片 */}
+          {linkSummary && expanded && (
+            <div style={{
+              marginTop:8, padding:"12px 14px", borderRadius:10,
+              background: T.surface, border:`1px solid ${T.border}`,
+              boxShadow: `0 2px 8px ${T.border}20`,
+              fontSize:11, color:T.textMuted, lineHeight:1.6,
+            }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                <div style={{ width:24, height:24, borderRadius:"50%", background:T.accent+"20", border:`1px solid ${T.accent}40`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12 }}>🔗</div>
+                <div style={{ fontSize:10, color:T.textDim, fontWeight:600, letterSpacing:0.5 }}>链接摘要</div>
+                <span style={{ fontSize:9, color:linkSummary.verified ? T.accent : "#CC4444", border:`1px solid ${linkSummary.verified ? T.accent : "#CC4444"}30`, padding:"1px 4px", borderRadius:3, marginLeft:"auto" }}>
+                  {linkSummary.verified ? "📡 已验证" : "⚠️ 仅供参考"}
+                </span>
+              </div>
+              {linkSummary.topic && (
+                <div style={{ fontSize:12, color:T.text, fontWeight:600, marginBottom:6 }}>
+                  📌 {linkSummary.topic}
+                </div>
+              )}
+              {linkSummary.points && linkSummary.points.length > 0 && (
+                <div style={{ marginBottom:6 }}>
+                  {linkSummary.points.map((point, index) => (
+                    <div key={index} style={{ fontSize:11, color:T.text, marginBottom:2 }}>
+                      · {point}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {linkSummary.value && (
+                <div style={{ fontSize:10, color:T.textDim, fontStyle:"italic" }}>
+                  💡 {linkSummary.value}
                 </div>
               )}
             </div>
