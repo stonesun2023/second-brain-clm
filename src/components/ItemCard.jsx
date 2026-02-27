@@ -11,6 +11,8 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
   const [expanded, setExpanded]   = useState(false);
   const [displayed, setDisplayed] = useState(""); // typewriter text
   const [typing, setTyping]       = useState(false);
+  const [bookInfo, setBookInfo]   = useState(null); // 书摘信息
+  const [bookInfoLoading, setBookInfoLoading] = useState(false);
   const c     = catInfo(item.cat);
   const agent = AGENTS[item.cat] || { name: "未知", avatar: "❓", greeting: "", system: "" };
   const typingRef = useRef(null);
@@ -75,6 +77,52 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
     setExpanded(next);
     if (next && item.agentNote && displayed !== item.agentNote.text) {
       setDisplayed(item.agentNote.text); // show full on re-expand
+    }
+  };
+
+  // 查出处功能 - 仅在 read 类目时显示
+  const handleCheckSource = async () => {
+    if (bookInfoLoading || bookInfo) return;
+    setBookInfoLoading(true);
+    try {
+      const prompt = `请从以下文本中识别出书名、作者、出版年份（如果能推断）、所在章节（如能推断）、以及一句话核心观点。如果文本中没有识别到书籍信息，请返回"未识别到书籍信息"。
+
+文本：${item.text}
+
+请以JSON格式返回，包含以下字段：
+- bookTitle: 书名
+- author: 作者
+- year: 出版年份（可选）
+- chapter: 所在章节（可选）
+- coreIdea: 一句话核心观点
+
+如果未识别到书籍信息，请返回：{"message": "未识别到书籍信息"}`;
+      
+      const result = await callAI({
+        modelId: aiConfig.modelId,
+        apiKey: aiConfig.apiKey,
+        system: "你是一个书籍信息专家。用户会给你一段读书笔记或书名，你需要根据你的知识库推断并返回书籍信息。\n\n规则：\n1. 即使信息不完整，也要尽力根据书名推断作者、年份等信息\n2. 如果能识别书名，作者和年份通常都能推断出来，不要轻易返回\"未识别\"\n3. 只返回纯 JSON，不加任何解释或 markdown\n\n返回格式：\n{\"bookTitle\":\"书名\",\"author\":\"作者\",\"year\":\"出版年份\",\"chapter\":\"章节（无法判断填空字符串）\",\"coreIdea\":\"用一句话说这本书最核心的观点\"}",
+        userContent: prompt,
+        maxTokens: 300,
+      });
+      
+      // 清理可能的 markdown 代码块包裹
+      const clean = result.replace(/```json|```/g, "").trim();
+      
+      // 尝试解析 JSON
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(clean);
+      } catch (e) {
+        // 如果解析失败，尝试提取关键信息
+        parsedResult = { message: clean };
+      }
+      
+      setBookInfo(parsedResult);
+    } catch (e) {
+      setBookInfo({ message: `查询失败：${e.message}` });
+    } finally {
+      setBookInfoLoading(false);
     }
   };
 
@@ -199,6 +247,77 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
             {displayed || item.agentNote.text}
             {typing && <span style={{ opacity:0.5, animation:"pulse 0.8s ease infinite" }}>▌</span>}
           </div>
+
+          {/* 查出处按钮 - 仅在 read 类目时显示 */}
+          {item.cat === "read" && hasNote && expanded && (
+            <div style={{ marginTop:8, display:"flex", justifyContent:"flex-end" }}>
+              <button
+                onClick={handleCheckSource}
+                disabled={bookInfoLoading}
+                style={{
+                  padding:"6px 10px", borderRadius:16,
+                  background: bookInfo ? T.surface : T.accent,
+                  border:`1px solid ${T.border}`,
+                  cursor: bookInfoLoading ? "wait" : "pointer",
+                  fontSize:10, color: bookInfo ? T.textMuted : "#000",
+                  fontFamily:"inherit",
+                }}
+              >
+                {bookInfoLoading ? "查询中..." : bookInfo ? "已查询" : "查出处"}
+              </button>
+            </div>
+          )}
+
+          {/* 书摘信息卡片 - 仅在 read 类目时显示 */}
+          {item.cat === "read" && bookInfo && expanded && (
+            <div style={{
+              marginTop:8, padding:"12px 14px", borderRadius:10,
+              background: T.surface, border:`1px solid ${T.border}`,
+              boxShadow: `0 2px 8px ${T.border}20`,
+              fontSize:11, color:T.textMuted, lineHeight:1.6,
+            }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                <div style={{ width:24, height:24, borderRadius:"50%", background:T.accent+"20", border:`1px solid ${T.accent}40`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12 }}>📚</div>
+                <div style={{ fontSize:10, color:T.textDim, fontWeight:600, letterSpacing:0.5 }}>书摘信息</div>
+              </div>
+              {bookInfo.message ? (
+                <div style={{ fontSize:11, color:T.textDim }}>{bookInfo.message}</div>
+              ) : (
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px 12px" }}>
+                  {bookInfo.bookTitle && (
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:6 }}>
+                      <span style={{ fontSize:10, color:T.textDim, minWidth:36 }}>书名</span>
+                      <span style={{ color:T.text }}>{bookInfo.bookTitle}</span>
+                    </div>
+                  )}
+                  {bookInfo.author && (
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:6 }}>
+                      <span style={{ fontSize:10, color:T.textDim, minWidth:36 }}>作者</span>
+                      <span style={{ color:T.text }}>{bookInfo.author}</span>
+                    </div>
+                  )}
+                  {bookInfo.year && (
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:6 }}>
+                      <span style={{ fontSize:10, color:T.textDim, minWidth:36 }}>年份</span>
+                      <span style={{ color:T.text }}>{bookInfo.year}</span>
+                    </div>
+                  )}
+                  {bookInfo.chapter && (
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:6 }}>
+                      <span style={{ fontSize:10, color:T.textDim, minWidth:36 }}>章节</span>
+                      <span style={{ color:T.text }}>{bookInfo.chapter}</span>
+                    </div>
+                  )}
+                  {bookInfo.coreIdea && (
+                    <div style={{ gridColumn:"1 / -1", display:"flex", alignItems:"flex-start", gap:6 }}>
+                      <span style={{ fontSize:10, color:T.textDim, minWidth:36 }}>观点</span>
+                      <span style={{ color:T.text, fontStyle:"italic" }}>{bookInfo.coreIdea}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

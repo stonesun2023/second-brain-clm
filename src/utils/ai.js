@@ -41,18 +41,8 @@ export async function callAI({ modelId, apiKey, system, userContent, maxTokens =
 
   // ── Anthropic ──
   if (m.provider === "anthropic") {
-    const res = await fetch(m.endpoint, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        model: m.model, max_tokens: maxTokens,
-        system,
-        messages:[{ role:"user", content: userContent }],
-      })
-    });
-    if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||`HTTP ${res.status}`); }
-    const data = await res.json();
-    return data.content?.[0]?.text || "";
+    // Anthropic API 不支持浏览器直接调用，需要通过后端代理
+    throw new Error("Anthropic API 不支持浏览器直接调用，请使用其他模型或配置后端代理");
   }
 
   // ── Google Gemini ──

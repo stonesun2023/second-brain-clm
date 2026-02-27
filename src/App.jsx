@@ -18,55 +18,43 @@ export default function App() {
   const [dark,  setDark]          = useTheme();
   const [showCapture, setShowCapture] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [storageReady, setStorageReady] = useState(false);
-  const [modelId, setModelId]     = useState("claude-sonnet");
-  const [apiKeys, setApiKeys]     = useState({}); // { modelId: key }
+  const [modelId, setModelId]     = useState(() => {
+    const saved = localStorage.getItem(MODEL_KEY);
+    return saved || "glm-4-flash";
+  });
+  const [apiKeys, setApiKeys]     = useState(() => {
+    const keys = {};
+    MODELS.forEach(m => {
+      const saved = localStorage.getItem(APIKEY_PRE + m.id);
+      keys[m.id] = saved || "";
+    });
+    return keys;
+  });
   const T = dark ? DARK : LIGHT;
 
   const touchX   = useRef(null);
   const dragging = useRef(false);
   const [dragDx, setDragDx] = useState(0);
 
-  // Load from storage on mount
+  // 同步保存 items 到 localStorage
   useEffect(() => {
-    (async () => {
-      const [savedItems, savedDark, savedModel] = await Promise.all([
-        loadFromStorage(), loadTheme(), loadModelConfig()
-      ]);
-      if (savedItems) setItems(savedItems);
-      setDark(savedDark);
-      setModelId(savedModel);
-      // Load API keys for all models
-      const keys = {};
-      for (const m of MODELS) {
-        keys[m.id] = await loadApiKey(m.id);
-      }
-      setApiKeys(keys);
-      setStorageReady(true);
-      // 时间测试
-      console.log('时间测试:', parseDateFromText("明天下午3点开会"));
-    })();
-  }, []);
-
-  // Save items whenever they change (after initial load)
-  useEffect(() => {
-    if (storageReady) saveToStorage(items);
-  }, [items, storageReady]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }, [items]);
 
   const toggleDark = () => {
     const next = !dark;
     setDark(next);
-    saveTheme(next);
+    localStorage.setItem(THEME_KEY, next ? "dark" : "light");
   };
 
   const handleModelChange = (id) => {
     setModelId(id);
-    saveModelConfig(id);
+    localStorage.setItem(MODEL_KEY, id);
   };
 
   const handleApiKeyChange = (id, key) => {
     setApiKeys(prev => ({...prev, [id]: key}));
-    saveApiKey(id, key);
+    localStorage.setItem(APIKEY_PRE + id, key);
   };
 
   // Build AI config object to pass to children
@@ -109,10 +97,10 @@ export default function App() {
     return newItem;
   };
 
-  const resetData = async () => {
+  const resetData = () => {
     if(!window.confirm("重置所有数据？")) return;
     setItems(INIT_ITEMS);
-    try { await window.storage.delete(STORAGE_KEY); } catch(e){}
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   const currentModel = MODELS.find(m=>m.id===modelId) || MODELS[0];
@@ -166,9 +154,9 @@ export default function App() {
 
         {/* Storage indicator */}
         <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:8 }}>
-          <div style={{ width:5, height:5, borderRadius:"50%", background:storageReady?"#3A8A5A":"#888", transition:"background 0.5s" }}/>
+          <div style={{ width:5, height:5, borderRadius:"50%", background:"#3A8A5A", transition:"background 0.5s" }}/>
           <span style={{ fontSize:9, color:T.textDim, letterSpacing:1 }}>
-            {storageReady ? `数据已同步 · ${items.length}条记录` : "同步中…"}
+            数据已同步 · {items.length}条记录
           </span>
           <button onClick={resetData} style={{ marginLeft:"auto", fontSize:8, color:T.textDim, background:"none", border:"none", cursor:"pointer", letterSpacing:1 }}>重置</button>
         </div>
@@ -245,49 +233,6 @@ export default function App() {
   );
 }
 
-// ─── STORAGE UTILS ─────────────────────────────────────────────────────────────
-async function loadFromStorage() {
-  try {
-    const r = await window.storage.get(STORAGE_KEY);
-    if (r && r.value) return JSON.parse(r.value);
-  } catch(e) {}
-  return null;
-}
-async function saveToStorage(items) {
-  try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(items));
-  } catch(e) {}
-}
-async function loadTheme() {
-  try {
-    const r = await window.storage.get(THEME_KEY);
-    if (r) return r.value !== "light"; // return isDark
-  } catch(e) {}
-  return false; // default LIGHT
-}
-async function saveTheme(isDark) {
-  try {
-    await window.storage.set(THEME_KEY, isDark ? "dark" : "light");
-  } catch(e) {}
-}
-async function loadModelConfig() {
-  try {
-    const r = await window.storage.get(MODEL_KEY);
-    return r ? r.value : "claude-sonnet";
-  } catch(e) { return "claude-sonnet"; }
-}
-async function saveModelConfig(id) {
-  try { await window.storage.set(MODEL_KEY, id); } catch(e) {}
-}
-async function loadApiKey(modelId) {
-  try {
-    const r = await window.storage.get(APIKEY_PRE + modelId);
-    return r ? r.value : "";
-  } catch(e) { return ""; }
-}
-async function saveApiKey(modelId, key) {
-  try { await window.storage.set(APIKEY_PRE + modelId, key); } catch(e) {}
-}
 
 // ─── INIT DATA ─────────────────────────────────────────────────────────────────
 const INIT_ITEMS = [
