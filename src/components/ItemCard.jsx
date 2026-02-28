@@ -194,13 +194,36 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
 
   return (
     <div style={{ marginBottom:8 }}>
+      {/* 照片展示区域 */}
+      {item.photo && (
+        <div style={{ 
+          width: "100%", 
+          height: 180, 
+          overflow: "hidden", 
+          borderRadius: "8px 8px 0 0",
+          border: `1px solid ${T.border}`,
+          borderBottom: "none"
+        }}>
+          <img 
+            src={item.photo} 
+            alt="照片" 
+            style={{ 
+              width: "100%", 
+              height: "100%", 
+              objectFit: "cover", 
+              display: "block" 
+            }} 
+          />
+        </div>
+      )}
       {/* Main row */}
       <div style={{
         display:"flex", gap:10, padding:"10px 12px",
         background:T.surface,
         borderLeft:`3px solid ${item.done ? "transparent" : c.color}`,
-        borderRadius: hasNote && expanded ? "8px 8px 0 0" : 8,
+        borderRadius: hasNote && expanded ? (item.photo ? "0 0 8px 8px" : "8px 8px 0 0") : (item.photo ? "0 0 8px 8px" : 8),
         border:`1px solid ${T.border}`,
+        borderTop: item.photo ? "none" : `1px solid ${T.border}`,
         borderBottom: hasNote && expanded ? "none" : `1px solid ${T.border}`,
         opacity:item.done ? 0.45 : 1, transition:"opacity 0.2s",
       }}>

@@ -16,7 +16,8 @@ export default function App() {
   const [items, setItems]         = useItems();
   const [page,  setPage]          = useState(1);
   const [dark,  setDark]          = useTheme();
-  const [showCapture, setShowCapture] = useState(false);
+  const [showCapture, setShowCapture] = useState(null); // null | 'text' | 'photo'
+  const [capturePhoto, setCapturePhoto] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [modelId, setModelId]     = useState(() => {
     const saved = localStorage.getItem(MODEL_KEY);
@@ -78,6 +79,31 @@ export default function App() {
 
   // 从主列表删除条目
   const removeItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
+
+  // 全局拍照处理
+  const handleGlobalPhotoCapture = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxSize = 800;
+        let w = img.width, h = img.height;
+        if (w > h && w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else if (h > w && h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        setCapturePhoto(canvas.toDataURL('image/jpeg', 0.75));
+        setShowCapture('photo');
+        // 重置 input
+        e.target.value = '';
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // 监听归档恢复事件，将条目添加回主列表
   useEffect(() => {
@@ -198,16 +224,70 @@ export default function App() {
         </div>
       </div>
 
-      <button onClick={()=>setShowCapture(true)} style={{
-        position:"fixed", bottom:20, right:"calc(50% - 220px)",
-        width:50, height:50, borderRadius:"50%",
-        background:T.accent, color:"#000", border:"none",
-        fontSize:24, cursor:"pointer", zIndex:100,
-        boxShadow:`0 4px 24px ${T.accent}55`,
-        display:"flex", alignItems:"center", justifyContent:"center",
-      }}>+</button>
+      <div style={{
+        position:"fixed", bottom:20,
+        left:"50%", transform:"translateX(-50%)",
+        display:"flex", gap:12, zIndex:100
+      }}>
+        {/* 文字/语音入口 */}
+        <button
+          onClick={() => setShowCapture('text')}
+          style={{
+            padding:"12px 24px", borderRadius:24,
+            background:T.accent, color:"#000",
+            border:"none", cursor:"pointer",
+            fontSize:14, fontWeight:700,
+            fontFamily:"inherit",
+            display:"flex", alignItems:"center", gap:8,
+            boxShadow:"0 4px 16px rgba(0,0,0,0.3)"
+          }}
+        >
+          ✏️ 文字/语音
+        </button>
 
-      {showCapture && <CaptureDrawer onClose={()=>setShowCapture(false)} onAdd={addItem} T={T}/>}
+        {/* 拍照入口 */}
+        <>
+          <input
+            type="file"
+            accept="image/*"
+            id="global-photo-input"
+            style={{ display:'none' }}
+            onChange={handleGlobalPhotoCapture}
+          />
+          <button
+            onClick={() => document.getElementById('global-photo-input').click()}
+            style={{
+              padding:"12px 24px", borderRadius:24,
+              background:T.surface2, color:T.text,
+              border:`1px solid ${T.border}`, cursor:"pointer",
+              fontSize:14, fontWeight:700,
+              fontFamily:"inherit",
+              display:"flex", alignItems:"center", gap:8,
+              boxShadow:"0 4px 16px rgba(0,0,0,0.3)"
+            }}
+          >
+            📷 拍照
+          </button>
+        </>
+      </div>
+
+      {showCapture === 'text' && (
+        <CaptureDrawer
+          onClose={() => setShowCapture(null)}
+          onAdd={(item) => { addItem(item); setShowCapture(null); }}
+          T={T}
+          mode="text"
+        />
+      )}
+      {showCapture === 'photo' && capturePhoto && (
+        <CaptureDrawer
+          onClose={() => { setShowCapture(null); setCapturePhoto(null); }}
+          onAdd={(item) => { addItem(item); setShowCapture(null); setCapturePhoto(null); }}
+          T={T}
+          mode="photo"
+          initialPhoto={capturePhoto}
+        />
+      )}
       {showSettings && (
         <SettingsPanel
           T={T}
