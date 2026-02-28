@@ -202,7 +202,7 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
 
   const submit=()=>{ 
     if(!text.trim()) return; 
-    onAdd({cat:selCat,text:text.trim(),priority,deadline,photo:photo||null}); 
+    onAdd({cat:selCat,text:text.trim(),priority,deadline,photo:photo||attachImage||null}); 
     setPhoto(null); 
     setAttachImage(null); // 清空附件
     onClose(); 
