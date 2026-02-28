@@ -51,6 +51,7 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
   const ref=useRef(null);
   const attachInputRef=useRef(null);
   const prevTranscriptRef = useRef('');
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   useEffect(()=>{ ref.current?.focus(); },[]);
 
   // 语音输入
@@ -354,6 +355,13 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
             {timeHint && (
               <div style={{ fontSize:11,color:T.textDim,marginTop:6 }}>
                 {timeHint}
+              </div>
+            )}
+
+            {/* 语音输入提示 */}
+            {isMobile && (
+              <div style={{ fontSize:11, color:T.textDim, marginTop:6, textAlign:'center' }}>
+                💡 点输入框后，点键盘上的🎤即可语音输入
               </div>
             )}
 
