@@ -7,17 +7,19 @@ export function useSpeech() {
   
   const recognitionRef = useRef(null);
   const isManualStopRef = useRef(false);
+  const listeningRef = useRef(false);
 
   const start = useCallback(() => {
     if (!recognitionRef.current) return;
-    setTranscript('');
+    listeningRef.current = true;
     setListening(true);
-    recognitionRef.current.start();
+    try { recognitionRef.current.start(); } catch(e) {}
   }, []);
 
   const stop = useCallback(() => {
     if (!recognitionRef.current) return;
-    isManualStopRef.current = true;  // 标记为手动停止
+    listeningRef.current = false;
+    isManualStopRef.current = true;
     setListening(false);
     recognitionRef.current.stop();
   }, []);
@@ -37,37 +39,36 @@ export function useSpeech() {
     const rec = recognitionRef.current;
     
     rec.lang = 'zh-CN';
-    rec.continuous = true;
-    rec.interimResults = true;
+    rec.continuous = false;
+    rec.interimResults = false;
     
     rec.onresult = (event) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-      
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcriptPart = result[0].transcript;
-        
-        if (result.isFinal) {
-          finalTranscript += transcriptPart;
-        } else {
-          interimTranscript += transcriptPart;
+      let final = '';
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
         }
       }
-      
-      setTranscript(finalTranscript + interimTranscript);
+      if (final) {
+        setTranscript(prev => prev + final);
+      }
     };
 
     rec.onend = () => {
-      setListening(false);
       if (isManualStopRef.current) {
-        isManualStopRef.current = false; // 重置标记
-        return; // 手动停止，不重新初始化
+        isManualStopRef.current = false;
+        setListening(false);
+        setTimeout(() => { initRecognition(); }, 100);
+        return;
       }
-      // iOS Safari 自动停止时才重新初始化
-      setTimeout(() => {
-        initRecognition();
-      }, 100);
+      // 非手动停止：累积 transcript 并自动重启
+      if (listeningRef.current) {
+        setTimeout(() => {
+          if (recognitionRef.current) {
+            try { recognitionRef.current.start(); } catch(e) {}
+          }
+        }, 100);
+      }
     };
 
     rec.onerror = (event) => {

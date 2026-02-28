@@ -50,6 +50,7 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
   const [cats] = useCats();
   const ref=useRef(null);
   const attachInputRef=useRef(null);
+  const prevTranscriptRef = useRef('');
   useEffect(()=>{ ref.current?.focus(); },[]);
 
   // 语音输入
@@ -57,7 +58,12 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
 
   // 实时更新输入框
   useEffect(()=>{
-    setText(transcript);
+    if (!transcript) return;
+    const newPart = transcript.slice(prevTranscriptRef.current.length);
+    if (newPart) {
+      setText(prev => prev + newPart);
+    }
+    prevTranscriptRef.current = transcript;
   }, [transcript]);
 
   // 实时识别时间
@@ -270,7 +276,14 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
                 style={{ width:"100%",background:T.surface2,border:`1px solid ${T.border2}`,borderRadius:10,padding:"12px 14px",color:T.text,fontSize:14,resize:"none",height:88,fontFamily:"inherit",outline:"none",lineHeight:1.6 }}
               />
               <button
-                onClick={supported ? (listening ? stop : start) : undefined}
+                onClick={() => {
+                  if (listening) {
+                    prevTranscriptRef.current = '';
+                    stop();
+                  } else {
+                    start();
+                  }
+                }}
                 disabled={!supported}
                 style={{
                   position:"absolute", right:8, bottom:8,
