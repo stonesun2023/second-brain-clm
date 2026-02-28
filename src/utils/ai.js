@@ -33,6 +33,13 @@ export const MODELS = [
     keyPlaceholder:"填入你的 GLM API Key",
     note:"新版 Key 直接粘贴即可，无需额外处理",
   },
+  {
+    id:"glm-4v-flash",   label:"GLM-4V Flash",  provider:"openai-compat",
+    endpoint:"https://open.bigmodel.cn/api/paas/v4/chat/completions",
+    model:"glm-4v-flash", free:true, region:"国内直连 ✅ 有免费额度",
+    keyPlaceholder:"填入你的 GLM API Key",
+    note:"支持图片输入的视觉模型",
+  },
 ];
 
 // Universal AI call — handles all providers transparently
@@ -47,13 +54,33 @@ export async function callAI({ modelId, apiKey, system, userContent, maxTokens =
 
   // ── Google Gemini ──
   if (m.provider === "google") {
+    // 处理 userContent 为数组或字符串的情况
+    let userParts = [];
+    if (Array.isArray(userContent)) {
+      userParts = userContent.map(item => {
+        if (item.type === "text") {
+          return { text: item.text };
+        } else if (item.type === "image") {
+          return {
+            inline_data: {
+              mime_type: item.source.media_type,
+              data: item.source.data
+            }
+          };
+        }
+        return null;
+      }).filter(Boolean);
+    } else {
+      userParts = [{ text: userContent }];
+    }
+
     const url = `${m.endpoint}?key=${apiKey}`;
     const res = await fetch(url, {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify({
         system_instruction:{ parts:[{ text: system }] },
-        contents:[{ role:"user", parts:[{ text: userContent }] }],
+        contents:[{ role:"user", parts: userParts }],
         generationConfig:{ maxOutputTokens: maxTokens },
       })
     });
@@ -63,11 +90,17 @@ export async function callAI({ modelId, apiKey, system, userContent, maxTokens =
   }
 
   // ── OpenAI-compatible (DeepSeek / Kimi / GLM) ──
+  // 处理 userContent 为数组或字符串的情况
+  let userMessageContent = userContent;
+  if (Array.isArray(userContent)) {
+    userMessageContent = userContent;
+  }
+
   const body = {
     model: m.model, max_tokens: maxTokens,
     messages:[
       { role:"system", content: system },
-      { role:"user",   content: userContent },
+      { role:"user",   content: userMessageContent },
     ],
   };
 

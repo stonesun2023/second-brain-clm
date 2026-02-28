@@ -45,8 +45,11 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
   const [deadline,setDeadline] = useState("");
   const [timeHint,setTimeHint] = useState("");
   const [photo,setPhoto]     = useState(initialPhoto);
+  const [attachImage,setAttachImage] = useState(null);
+  const [recognizing,setRecognizing] = useState(false);
   const [cats] = useCats();
   const ref=useRef(null);
+  const attachInputRef=useRef(null);
   useEffect(()=>{ ref.current?.focus(); },[]);
 
   // 语音输入
@@ -69,7 +72,141 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
     }
   }, [text]);
 
-  const submit=()=>{ if(!text.trim()) return; onAdd({cat:selCat,text:text.trim(),priority,deadline,photo:photo||null}); setPhoto(null); onClose(); };
+  // 图片压缩方法
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        const maxWidth = 1024;
+        const maxHeight = 1024;
+        
+        let width = img.width;
+        let height = img.height;
+        
+        // 计算缩放比例
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        const base64Data = canvas.toDataURL('image/jpeg', 0.85);
+        resolve(base64Data);
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // 处理附件图片
+  const handleAttachImage = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    try {
+      const base64Data = await compressImage(file);
+      setAttachImage(base64Data);
+      await handleRecognizeWithData(base64Data); // 直接传数据
+    } catch (error) {
+      console.error('图片压缩失败:', error);
+      alert('图片处理失败，请重试');
+    }
+  };
+
+  // 处理识别（接收 base64Data 参数）
+  const handleRecognizeWithData = async (base64Data) => {
+    if (!base64Data || recognizing) return;
+    
+    setRecognizing(true);
+    
+    const APIKEY_PRE = 'sb-apikey-v4-';
+    const VISION_SYSTEM = "你是图片内容识别专家。判断图片类型并处理：书页/文章→OCR原文保留段落；白板/手写→提炼要点；名片→姓名/职位/公司/电话/邮箱；其他→描述内容提炼核心信息。只输出识别结果，不加解释。";
+    
+    const imageContent = [
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64Data.split(',')[1] } },
+      { type: "text", text: "请识别这张图片的内容" }
+    ];
+    
+    try {
+      // 优先尝试 GLM-4V
+      const glmKey = localStorage.getItem(`${APIKEY_PRE}glm-4-flash`) || '';
+      if (glmKey) {
+        try {
+          const { callAI } = await import('../utils/ai.js');
+          const result = await callAI({
+            modelId: 'glm-4v-flash',
+            apiKey: glmKey,
+            system: VISION_SYSTEM,
+            userContent: imageContent,
+            maxTokens: 400
+          });
+          if (result) { setText(result); return; }
+        } catch (e) {
+          console.warn('GLM 识别失败，降级到 Gemini:', e.message);
+        }
+      }
+      
+      // 降级到 Gemini Flash
+      const geminiKey = localStorage.getItem(`${APIKEY_PRE}gemini-flash`) || '';
+      if (geminiKey) {
+        const { callAI } = await import('../utils/ai.js');
+        const result = await callAI({
+          modelId: 'gemini-flash',
+          apiKey: geminiKey,
+          system: VISION_SYSTEM,
+          userContent: imageContent,
+          maxTokens: 400
+        });
+        setText(result || "");
+        return;
+      }
+      
+      // 两个都没有 Key
+      alert("请先在设置中配置 GLM 或 Gemini 的 API Key");
+      
+    } catch (error) {
+      console.error('识别失败:', error);
+      alert("识别失败，请手动输入");
+    } finally {
+      setRecognizing(false);
+    }
+  };
+
+  // 处理识别（保留原方法，调用 handleRecognizeWithData）
+  const handleRecognize = async () => {
+    if (!attachImage || recognizing) return;
+    await handleRecognizeWithData(attachImage);
+  };
+
+  // 移除附件
+  const handleRemoveAttach = () => {
+    setAttachImage(null);
+    if (attachInputRef.current) {
+      attachInputRef.current.value = '';
+    }
+  };
+
+  const submit=()=>{ 
+    if(!text.trim()) return; 
+    onAdd({cat:selCat,text:text.trim(),priority,deadline,photo:photo||null}); 
+    setPhoto(null); 
+    setAttachImage(null); // 清空附件
+    onClose(); 
+  };
   return (
     <ErrorBoundary>
       <>
@@ -89,6 +226,38 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
               <div style={{ fontSize:10,letterSpacing:4,color:T.textDim }}>快速捕获</div>
               <button onClick={onClose} style={{ background:"none",border:"none",color:T.textDim,fontSize:18,cursor:"pointer" }}>✕</button>
             </div>
+
+            {/* 图片预览区 */}
+            {attachImage && (
+              <div style={{ position:"relative", width:"100%", height:72, marginBottom:8 }}>
+                <img 
+                  src={attachImage} 
+                  alt="附件预览" 
+                  style={{ 
+                    width:72, height:72, borderRadius:8, objectFit:"cover",
+                    border:`1px solid ${T.border2}`
+                  }} 
+                />
+                <button
+                  onClick={handleRemoveAttach}
+                  style={{
+                    position:"absolute", top:4, right:4, width:20, height:20,
+                    borderRadius:"50%", background:"#CC4444", color:"#FFF",
+                    border:"none", cursor:"pointer", fontSize:12,
+                    display:"flex", alignItems:"center", justifyContent:"center"
+                  }}
+                >×</button>
+                {recognizing && (
+                  <div style={{
+                    position:"absolute", inset:0, background:"rgba(0,0,0,0.5)",
+                    borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center",
+                    color:"#FFF", fontSize:14
+                  }}>
+                    🔍
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 文字输入区 */}
             <div style={{ position:"relative" }}>
@@ -132,6 +301,29 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
           {/* 标签行 */}
           <div style={{ display:"flex",gap:6,marginTop:12,flexWrap:"wrap",alignItems:"center" }}>
             {cats.map(c=><Pill key={c.id} active={selCat===c.id} color={c.color} T={T} onClick={()=>setSelCat(c.id)}>{c.icon} {c.label}</Pill>)}
+            
+            {/* 隐藏的文件输入框 */}
+            <input
+              ref={attachInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display:"none" }}
+              onChange={handleAttachImage}
+            />
+            
+            {/* 附件按钮 */}
+            <button
+              onClick={() => attachInputRef.current?.click()}
+              disabled={recognizing}
+              style={{
+                padding:"6px 12px", borderRadius:16, cursor:recognizing ? "not-allowed" : "pointer",
+                background:recognizing ? T.border2 : T.surface2,
+                border:`1px solid ${T.border2}`, color:recognizing ? T.textMuted : T.text,
+                fontSize:11, fontFamily:"inherit", display:"flex", alignItems:"center", gap:6
+              }}
+            >
+              {recognizing ? "🔍 识别中..." : "📎 附件"}
+            </button>
           </div>
 
             {/* 优先级 + 日期 */}

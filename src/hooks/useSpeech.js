@@ -6,6 +6,7 @@ export function useSpeech() {
   const [supported, setSupported] = useState(false);
   
   const recognitionRef = useRef(null);
+  const isManualStopRef = useRef(false);
 
   const start = useCallback(() => {
     if (!recognitionRef.current) return;
@@ -16,6 +17,7 @@ export function useSpeech() {
 
   const stop = useCallback(() => {
     if (!recognitionRef.current) return;
+    isManualStopRef.current = true;  // 标记为手动停止
     setListening(false);
     recognitionRef.current.stop();
   }, []);
@@ -58,6 +60,14 @@ export function useSpeech() {
 
     rec.onend = () => {
       setListening(false);
+      if (isManualStopRef.current) {
+        isManualStopRef.current = false; // 重置标记
+        return; // 手动停止，不重新初始化
+      }
+      // iOS Safari 自动停止时才重新初始化
+      setTimeout(() => {
+        initRecognition();
+      }, 100);
     };
 
     rec.onerror = (event) => {
