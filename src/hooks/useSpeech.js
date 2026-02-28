@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export function useSpeech() {
   const [listening, setListening] = useState(false);
@@ -67,9 +67,9 @@ export function useSpeech() {
   }, []);
 
   // 组件挂载时初始化
-  if (!recognitionRef.current && supported === false) {
+  useEffect(() => {
     initRecognition();
-  }
+  }, []);
 
   return {
     listening,
