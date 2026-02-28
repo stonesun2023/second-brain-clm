@@ -82,11 +82,16 @@ export function useSpeech() {
     initRecognition();
   }, []);
 
+  const resetTranscript = useCallback(() => {
+    setTranscript('');
+  }, []);
+
   return {
     listening,
     transcript,
     start,
     stop,
     supported,
+    resetTranscript,
   };
 }

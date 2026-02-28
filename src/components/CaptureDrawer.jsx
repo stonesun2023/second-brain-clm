@@ -54,7 +54,7 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
   useEffect(()=>{ ref.current?.focus(); },[]);
 
   // 语音输入
-  const { listening, transcript, start, stop, supported } = useSpeech();
+  const { listening, transcript, start, stop, supported, resetTranscript } = useSpeech();
 
   // 实时更新输入框
   useEffect(()=>{
@@ -278,9 +278,10 @@ export default function CaptureDrawer({ onClose, onAdd, T, mode='text', initialP
               <button
                 onClick={() => {
                   if (listening) {
-                    prevTranscriptRef.current = '';
                     stop();
                   } else {
+                    resetTranscript();
+                    prevTranscriptRef.current = '';
                     start();
                   }
                 }}
