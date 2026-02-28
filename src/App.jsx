@@ -203,7 +203,7 @@ export default function App() {
         onClick={() => setShowCapture('text')}
         style={{
           position:"fixed", bottom:20,
-          right:"calc(50% - 220px)",
+          right:20,
           width:50, height:50, borderRadius:"50%",
           background:T.accent, color:"#000",
           border:"none", fontSize:24,

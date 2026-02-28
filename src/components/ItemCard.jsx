@@ -131,18 +131,10 @@ export default function ItemCard({ item, onToggle, onNote, autoMode, T, aiConfig
   };
 
   // 地点识别和导航功能
-  const handleNavigate = async () => {
-    try {
-      const locationResult = await extractLocation(item.text, aiConfig);
-      if (locationResult.hasLocation && locationResult.locationName) {
-        const url = buildAmapUrl(locationResult.locationName);
-        if (url) {
-          window.open(url, '_blank');
-        }
-      }
-    } catch (e) {
-      console.error('导航失败:', e);
-    }
+  const handleNavigate = () => {
+    const encodedText = encodeURIComponent(item.text.slice(0, 50).trim());
+    const url = `https://uri.amap.com/search?keyword=${encodedText}&dev=0&t=0`;
+    window.location.href = url;
   };
 
   // 链接摘要功能
